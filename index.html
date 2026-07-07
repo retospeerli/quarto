@@ -644,79 +644,94 @@ function choosePro(){
   const wins = actions.filter(a => a.win);
   if(wins.length) return wins[0];
 
-  let best = null;
-  let bestScore = -Infinity;
-  const depth = board.filter(x => x !== null).length < 6 ? 3 : 5;
+  // 1. Nie absichtlich eine Figur geben, mit der der Mensch sofort gewinnen kann.
+  const safe = actions.filter(a => {
+    if(a.nextPiece === null) return true;
+    const nb = afterPlace(board, a.cell, currentPiece);
+    return immediateWinningCells(nb, a.nextPiece, squaresEl.checked).length === 0;
+  });
 
-  for(const a of actions){
-    const nb = afterPlace(board,a.cell,currentPiece);
+  const pool = safe.length ? safe : actions;
+
+  // 2. Nur die besten Kandidaten tiefer prüfen. So bleibt das Spiel flüssig.
+  const candidates = pool
+    .map(a => ({a, score: heuristicForAction(a)}))
+    .sort((x,y) => y.score - x.score)
+    .slice(0, 24)
+    .map(x => x.a);
+
+  let best = candidates[0];
+  let bestScore = -Infinity;
+
+  for(const a of candidates){
+    const nb = afterPlace(board, a.cell, currentPiece);
     if(a.nextPiece === null) return a;
+
     const nu = used.slice();
     nu[a.nextPiece] = true;
 
-    let score = evaluateHumanTurn(nb, nu, a.nextPiece, depth);
-    score += heuristicStatic(nb, a.nextPiece) * 0.025;
+    // Schnelle 1-Zug-Vorausschau:
+    // Wie gefährlich wird es nach dem besten menschlichen Gegenzug?
+    let score = heuristicForActionOnBoard(nb, nu, a.nextPiece);
+
+    // Bonus: Gibt der PC eine Figur, mit der der Mensch keine Drohung aufbauen kann?
+    score -= maxHumanThreatAfterMove(nb, nu, a.nextPiece) * 450;
 
     if(score > bestScore){
       bestScore = score;
       best = a;
     }
   }
+
   return best || chooseAdvanced();
 }
 
-// Score: positiv = gut für PC, negativ = gut für Mensch.
-function evaluateHumanTurn(b,u,humanPiece,depth){
-  const humanWins = immediateWinningCells(b,humanPiece,squaresEl.checked);
-  if(humanWins.length) return -100000 - humanWins.length;
-
-  if(depth <= 0 || b.every(x => x !== null)) return heuristicStatic(b,humanPiece);
-
-  let worstForPc = Infinity;
+function maxHumanThreatAfterMove(b, u, humanPiece){
+  let maxThreat = 0;
 
   for(let cell=0; cell<16; cell++){
     if(b[cell] !== null) continue;
-    const hb = afterPlace(b,cell,humanPiece);
-    if(findWin(hb,squaresEl.checked)) return -100000;
 
-    const rem = remainingPieces(u);
-    if(!rem.length) return 0;
+    const hb = afterPlace(b, cell, humanPiece);
+    if(findWin(hb, squaresEl.checked)) return 999;
 
-    // Mensch wählt danach eine Figur für den PC und will dem PC schaden.
-    let bestForHumanChoice = Infinity;
-    for(const pcPiece of rem){
-      const nu = u.slice();
-      nu[pcPiece] = true;
-      const reply = evaluatePcTurn(hb, nu, pcPiece, depth-1);
-      if(reply < bestForHumanChoice) bestForHumanChoice = reply;
-    }
-
-    if(bestForHumanChoice < worstForPc) worstForPc = bestForHumanChoice;
-    if(worstForPc <= -90000) break;
+    // Nach dem menschlichen Setzen wählt der Mensch eine Figur für den PC.
+    // Je weniger Gewinnmöglichkeiten der PC dadurch erhält, desto besser für den Menschen.
+    // Für die Gefahr zählen wir vor allem, ob der Mensch mehrere Fast-Quartos erzeugt.
+    maxThreat = Math.max(maxThreat, countOpenThreats(hb));
   }
-  return worstForPc;
+
+  return maxThreat;
 }
 
-function evaluatePcTurn(b,u,pcPiece,depth){
-  const pcWins = immediateWinningCells(b,pcPiece,squaresEl.checked);
-  if(pcWins.length) return 100000 + pcWins.length;
+function countOpenThreats(b){
+  let threats = 0;
 
-  if(depth <= 0 || b.every(x => x !== null)) return heuristicStatic(b,pcPiece);
+  for(const g of allGroups(squaresEl.checked)){
+    const ids = g.map(i => b[i]);
+    const filled = ids.filter(x => x !== null);
+    if(filled.length !== 3) continue;
 
-  let bestForPc = -Infinity;
-  const actions = allLegalActions(b,u,pcPiece);
-
-  for(const a of actions){
-    const nb = afterPlace(b,a.cell,pcPiece);
-    if(a.win) return 100000;
-    if(a.nextPiece === null) return 0;
-
-    const nu = u.slice();
-    nu[a.nextPiece] = true;
-    const score = evaluateHumanTurn(nb,nu,a.nextPiece,depth-1);
-    if(score > bestForPc) bestForPc = score;
+    for(let bit=0; bit<4; bit++){
+      const mask = 1 << bit;
+      const one = filled.every(id => (id & mask) !== 0);
+      const zero = filled.every(id => (id & mask) === 0);
+      if(one || zero) threats++;
+    }
   }
-  return bestForPc;
+
+  return threats;
+}
+
+function heuristicForActionOnBoard(b, u, givenPiece){
+  let score = heuristicStatic(b, givenPiece);
+
+  // Prüfe, ob der PC nach einem menschlichen Fehler sofort gewinnen könnte.
+  for(const p of remainingPieces(u)){
+    score += immediateWinningCells(b, p, squaresEl.checked).length * 18;
+  }
+
+  return score;
 }
 
 function heuristicForAction(a){

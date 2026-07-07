@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quarto – Browserspiel</title>
+<style>
+  :root{
+    --bg:#efe8d8;
+    --panel:#fffaf0;
+    --panel2:#f8f1e4;
+    --ink:#1f2937;
+    --muted:#6b6258;
+    --line:#c9bda9;
+    --accent:#235f74;
+    --accent2:#e4f3f7;
+    --gold:#d99b2b;
+    --win:#15803d;
+    --danger:#b45309;
+    --shadow:0 14px 30px rgba(52,38,19,.14);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(217,155,43,.18), transparent 32%),
+      linear-gradient(135deg,#f7f0e2,var(--bg));
+    color:var(--ink);
+  }
+
+  main{
+    max-width:1240px;
+    margin:0 auto;
+    padding:18px;
+    min-height:100vh;
+  }
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:18px;
+    margin-bottom:14px;
+  }
+
+  h1{margin:0;font-size:34px;letter-spacing:.3px}
+  .subtitle{margin:3px 0 0;color:var(--muted)}
+
+  .topbar{
+    background:rgba(255,250,240,.92);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:12px;
+    box-shadow:var(--shadow);
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+
+  button,select{
+    font:inherit;
+    border-radius:12px;
+    border:1px solid var(--line);
+    padding:10px 12px;
+    background:white;
+    color:var(--ink);
+  }
+
+  button{
+    cursor:pointer;
+    background:var(--accent);
+    color:white;
+    border-color:var(--accent);
+    font-weight:650;
+  }
+
+  button.secondary{
+    background:white;
+    color:var(--ink);
+    border-color:var(--line);
+  }
+
+  label{
+    display:inline-flex;
+    gap:8px;
+    align-items:center;
+    white-space:nowrap;
+  }
+
+  .game{
+    display:grid;
+    grid-template-columns:minmax(460px, 1fr) minmax(420px, .95fr);
+    gap:18px;
+    align-items:start;
+  }
+
+  .panel{
+    background:rgba(255,250,240,.94);
+    border:1px solid var(--line);
+    border-radius:24px;
+    padding:18px;
+    box-shadow:var(--shadow);
+  }
+
+  .panel h2{
+    margin:0 0 12px;
+    font-size:22px;
+  }
+
+  .boardWrap{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+  }
+
+  .board{
+    width:min(92vw,520px);
+    aspect-ratio:1/1;
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    grid-template-rows:repeat(4,1fr);
+    gap:12px;
+    padding:16px;
+    border-radius:28px;
+    background:
+      linear-gradient(135deg,#b88a50,#7a4d22);
+    box-shadow:inset 0 0 0 5px rgba(65,37,13,.32), 0 12px 24px rgba(0,0,0,.18);
+  }
+
+  .cell{
+    border-radius:18px;
+    background:linear-gradient(145deg,#ead5aa,#c69b5d);
+    box-shadow:inset 0 4px 8px rgba(255,255,255,.35), inset 0 -5px 10px rgba(75,43,16,.25);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    transition:.16s transform,.16s outline,.16s background;
+  }
+
+  .cell.empty::after{
+    content:"";
+    width:58%;
+    height:58%;
+    border-radius:14px;
+    border:2px dashed rgba(69,43,19,.34);
+  }
+
+  .cell.playable{
+    outline:5px solid rgba(35,95,116,.45);
+    cursor:pointer;
+  }
+
+  .cell.playable:hover{
+    transform:translateY(-2px) scale(1.015);
+    background:linear-gradient(145deg,#f1ddb4,#d0a56a);
+  }
+
+  .cell.win{
+    outline:6px solid var(--win);
+    animation:pulse .9s ease-in-out infinite alternate;
+  }
+
+  @keyframes pulse{
+    from{filter:saturate(1)}
+    to{filter:saturate(1.4) brightness(1.08)}
+  }
+
+  .sideHeader{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:12px;
+  }
+
+  .pieceTray{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:12px;
+  }
+
+  .pieceSlot{
+    min-height:88px;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:linear-gradient(145deg,#fffdf8,#f0e4d0);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:default;
+    transition:.14s transform,.14s border,.14s background,.14s opacity;
+    position:relative;
+  }
+
+  .pieceSlot.selectable{
+    cursor:pointer;
+    border-color:var(--accent);
+    background:var(--accent2);
+  }
+
+  .pieceSlot.selectable:hover{
+    transform:translateY(-2px);
+    box-shadow:0 8px 16px rgba(35,95,116,.15);
+  }
+
+  .pieceSlot.used{
+    opacity:.15;
+  }
+
+  .pieceSlot.used::after{
+    content:"";
+    position:absolute;
+    width:70%;
+    height:3px;
+    background:#6b6258;
+    transform:rotate(-35deg);
+    border-radius:99px;
+  }
+
+  .piece{
+    width:76px;
+    height:76px;
+    display:block;
+    filter:drop-shadow(0 6px 4px rgba(0,0,0,.18));
+  }
+
+  .cell .piece{
+    width:min(78%,82px);
+    height:min(78%,82px);
+  }
+
+  .currentBox{
+    margin-top:16px;
+    display:grid;
+    grid-template-columns:112px 1fr;
+    gap:14px;
+    align-items:center;
+    background:var(--panel2);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:14px;
+    min-height:116px;
+  }
+
+  .currentPiece{
+    min-height:88px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:white;
+    border:1px dashed var(--line);
+    border-radius:18px;
+  }
+
+  .currentPiece .piece{
+    width:88px;
+    height:88px;
+  }
+
+  .status{
+    margin-top:14px;
+    padding:14px;
+    border-radius:18px;
+    background:#fff;
+    border:1px solid var(--line);
+    line-height:1.45;
+    min-height:76px;
+  }
+
+  .status strong{color:var(--accent)}
+  .status.winText strong{color:var(--win)}
+  .status.warn strong{color:var(--danger)}
+
+  .rules{
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.45;
+    margin-top:14px;
+  }
+
+  .badge{
+    background:#fff;
+    border:1px solid var(--line);
+    padding:7px 10px;
+    border-radius:999px;
+    font-size:14px;
+    color:var(--muted);
+  }
+
+  .thinking{
+    pointer-events:none;
+    opacity:.75;
+  }
+
+  @media (max-width: 940px){
+    header{flex-direction:column}
+    .topbar{width:100%}
+    .game{grid-template-columns:1fr}
+    .pieceTray{grid-template-columns:repeat(8,1fr)}
+    .pieceSlot{min-height:70px}
+    .piece{width:58px;height:58px}
+  }
+
+  @media (max-width: 620px){
+    main{padding:10px}
+    h1{font-size:28px}
+    .board{gap:7px;padding:10px;border-radius:20px}
+    .cell{border-radius:12px}
+    .pieceTray{grid-template-columns:repeat(4,1fr)}
+    .pieceSlot{min-height:72px}
+    .currentBox{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Quarto</h1>
+      <p class="subtitle">Du setzt die Figur, die dir der Gegner gibt. Danach gibst du dem Gegner eine Figur.</p>
+    </div>
+
+    <div class="topbar">
+      <label>
+        PC-Gegner
+        <select id="level">
+          <option value="beginner">Anfänger</option>
+          <option value="advanced">Fortgeschritten</option>
+          <option value="pro" selected>Profi</option>
+        </select>
+      </label>
+
+      <label>
+        <input type="checkbox" id="squares" checked>
+        2×2-Quadrate zählen
+      </label>
+
+      <button id="newGame">Neues Spiel</button>
+    </div>
+  </header>
+
+  <section class="game">
+    <div class="panel">
+      <div class="sideHeader">
+        <h2>Spielfeld</h2>
+        <span class="badge">4 × 4 Felder</span>
+      </div>
+      <div class="boardWrap">
+        <div id="board" class="board"></div>
+      </div>
+
+      <div class="currentBox">
+        <div id="currentPiece" class="currentPiece">–</div>
+        <div>
+          <strong>Aktuelle Figur für dich</strong>
+          <div id="currentText" class="rules">Der PC wählt eine Figur aus. Du setzt sie auf ein freies Feld.</div>
+        </div>
+      </div>
+
+      <div id="status" class="status"></div>
+    </div>
+
+    <div class="panel">
+      <div class="sideHeader">
+        <h2>Freie Figuren</h2>
+        <span id="remainingBadge" class="badge">16 Figuren</span>
+      </div>
+      <div id="pieces" class="pieceTray"></div>
+
+      <div class="rules">
+        <strong>Ziel:</strong> Vier Figuren müssen mindestens eine gemeinsame Eigenschaft haben:
+        hell/dunkel, gross/klein, rund/eckig oder mit/ohne Loch.
+        Mit der Variante zählen auch vier Figuren, die ein 2×2-Quadrat bilden.
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const boardEl = document.getElementById("board");
+const piecesEl = document.getElementById("pieces");
+const statusEl = document.getElementById("status");
+const currentPieceEl = document.getElementById("currentPiece");
+const currentTextEl = document.getElementById("currentText");
+const levelEl = document.getElementById("level");
+const squaresEl = document.getElementById("squares");
+const newGameBtn = document.getElementById("newGame");
+const remainingBadge = document.getElementById("remainingBadge");
+
+let board, used, phase, currentPiece, gameOver, winCells, thinking;
+
+const pieces = Array.from({length:16}, (_, id) => ({
+  id,
+  tall: !!(id & 1),
+  dark: !!(id & 2),
+  round: !!(id & 4),
+  hole: !!(id & 8)
+}));
+
+function svgPiece(id){
+  const p = pieces[id];
+  const fill = p.dark ? "#2b2118" : "#f7ead2";
+  const stroke = "#201914";
+  const size = p.tall ? 58 : 42;
+  const x = 38 - size/2;
+  const y = p.tall ? 9 : 25;
+  const rx = p.round ? size/2 : 8;
+  const hole = p.hole ? `<circle cx="38" cy="${y + size/2}" r="${p.tall ? 10 : 8}" fill="#fffaf0" stroke="${stroke}" stroke-width="4"/>` : "";
+  const base = p.round
+    ? `<ellipse cx="38" cy="${y + size/2}" rx="${size/2}" ry="${size/2}" fill="${fill}" stroke="${stroke}" stroke-width="4"/>`
+    : `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-width="4"/>`;
+  const foot = p.tall
+    ? `<ellipse cx="38" cy="69" rx="24" ry="5" fill="rgba(0,0,0,.16)"/>`
+    : `<ellipse cx="38" cy="69" rx="18" ry="4" fill="rgba(0,0,0,.14)"/>`;
+  return `<svg class="piece" viewBox="0 0 76 76" aria-label="${namePiece(id)}">${foot}${base}${hole}</svg>`;
+}
+
+function namePiece(id){
+  const p = pieces[id];
+  return [
+    p.dark ? "dunkel" : "hell",
+    p.tall ? "gross" : "klein",
+    p.round ? "rund" : "eckig",
+    p.hole ? "mit Loch" : "ohne Loch"
+  ].join(", ");
+}
+
+function allGroups(includeSquares){
+  const groups = [];
+  for(let r=0;r<4;r++) groups.push([r*4,r*4+1,r*4+2,r*4+3]);
+  for(let c=0;c<4;c++) groups.push([c,c+4,c+8,c+12]);
+  groups.push([0,5,10,15],[3,6,9,12]);
+  if(includeSquares){
+    for(let r=0;r<3;r++){
+      for(let c=0;c<3;c++){
+        const i = r*4+c;
+        groups.push([i,i+1,i+4,i+5]);
+      }
+    }
+  }
+  return groups;
+}
+
+function groupWins(ids){
+  for(let bit=0; bit<4; bit++){
+    const mask = 1 << bit;
+    const one = ids.every(id => (id & mask) !== 0);
+    const zero = ids.every(id => (id & mask) === 0);
+    if(one || zero) return true;
+  }
+  return false;
+}
+
+function findWin(b, includeSquares){
+  for(const g of allGroups(includeSquares)){
+    const ids = g.map(i => b[i]);
+    if(ids.every(id => id !== null) && groupWins(ids)) return g;
+  }
+  return null;
+}
+
+function remainingPieces(u, exclude=null){
+  const arr = [];
+  for(let i=0;i<16;i++) if(!u[i] && i !== exclude) arr.push(i);
+  return arr;
+}
+
+function afterPlace(b, cell, piece){
+  const nb = b.slice();
+  nb[cell] = piece;
+  return nb;
+}
+
+function immediateWinningCells(b, piece, includeSquares){
+  const cells = [];
+  for(let i=0;i<16;i++){
+    if(b[i] !== null) continue;
+    const nb = afterPlace(b,i,piece);
+    if(findWin(nb, includeSquares)) cells.push(i);
+  }
+  return cells;
+}
+
+function init(){
+  board = Array(16).fill(null);
+  used = Array(16).fill(false);
+  phase = "humanChooseForPc";
+  currentPiece = null;
+  gameOver = false;
+  winCells = [];
+  thinking = false;
+  render();
+  setStatus("Wähle rechts eine Figur für den PC.");
+}
+
+function render(){
+  document.body.classList.toggle("thinking", thinking);
+
+  boardEl.innerHTML = "";
+  board.forEach((id,i) => {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    if(id === null) cell.classList.add("empty");
+    if(winCells.includes(i)) cell.classList.add("win");
+    if(!gameOver && !thinking && phase === "humanPlace" && id === null) cell.classList.add("playable");
+    cell.innerHTML = id === null ? "" : svgPiece(id);
+    cell.addEventListener("click", () => humanPlace(i));
+    boardEl.appendChild(cell);
+  });
+
+  piecesEl.innerHTML = "";
+  pieces.forEach(p => {
+    const slot = document.createElement("div");
+    slot.className = "pieceSlot";
+    if(used[p.id]) slot.classList.add("used");
+    if(!gameOver && !thinking && phase === "humanChooseForPc" && !used[p.id]) slot.classList.add("selectable");
+    slot.innerHTML = svgPiece(p.id);
+    slot.title = namePiece(p.id);
+    slot.addEventListener("click", () => humanChooseForPc(p.id));
+    piecesEl.appendChild(slot);
+  });
+
+  const rem = remainingPieces(used).length;
+  remainingBadge.textContent = rem + (rem === 1 ? " Figur" : " Figuren");
+
+  currentPieceEl.innerHTML = currentPiece === null ? "–" : svgPiece(currentPiece);
+  currentTextEl.textContent = currentPiece === null
+    ? "Im Moment hast du keine Figur zum Setzen."
+    : namePiece(currentPiece);
+}
+
+function setStatus(text, cls=""){
+  statusEl.className = "status " + cls;
+  statusEl.innerHTML = text;
+}
+
+function humanChooseForPc(id){
+  if(gameOver || thinking || phase !== "humanChooseForPc" || used[id]) return;
+  used[id] = true;
+  currentPiece = id;
+  phase = "pcPlace";
+  thinking = true;
+  render();
+  setStatus(`Du gibst dem PC: <strong>${namePiece(id)}</strong>. Der PC denkt nach ...`);
+  setTimeout(() => {
+    pcTurn();
+    thinking = false;
+    render();
+  }, 420);
+}
+
+function humanPlace(i){
+  if(gameOver || thinking || phase !== "humanPlace" || board[i] !== null || currentPiece === null) return;
+  board[i] = currentPiece;
+  const win = findWin(board, squaresEl.checked);
+  if(win) return endGame("Du gewinnst mit Quarto!", win);
+  if(board.every(x => x !== null)) return draw();
+  currentPiece = null;
+  phase = "humanChooseForPc";
+  render();
+  setStatus("Gut gesetzt. Wähle nun rechts eine Figur für den PC.");
+}
+
+function pcTurn(){
+  if(gameOver || phase !== "pcPlace") return;
+  const move = choosePcMove();
+  board[move.cell] = currentPiece;
+  const win = findWin(board, squaresEl.checked);
+  if(win) return endGame("Der PC gewinnt mit Quarto!", win);
+
+  if(board.every(x => x !== null)) return draw();
+
+  used[move.nextPiece] = true;
+  currentPiece = move.nextPiece;
+  phase = "humanPlace";
+  setStatus(`Der PC hat gesetzt und gibt dir: <strong>${namePiece(currentPiece)}</strong>. Klicke links auf ein freies Feld.`);
+}
+
+function endGame(text,cells){
+  gameOver = true;
+  thinking = false;
+  winCells = cells;
+  render();
+  setStatus(`<strong>${text}</strong>`, "winText");
+}
+
+function draw(){
+  gameOver = true;
+  thinking = false;
+  render();
+  setStatus("<strong>Unentschieden.</strong> Es wurde keine Quarto-Gruppe gebildet.", "warn");
+}
+
+function allLegalActions(b,u,piece){
+  const actions = [];
+  for(let cell=0; cell<16; cell++){
+    if(b[cell] !== null) continue;
+    const nb = afterPlace(b,cell,piece);
+    const win = !!findWin(nb, squaresEl.checked);
+    if(win){
+      actions.push({cell, nextPiece:null, win:true});
+    } else {
+      for(const np of remainingPieces(u)){
+        actions.push({cell, nextPiece:np, win:false});
+      }
+    }
+  }
+  return actions;
+}
+
+function choosePcMove(){
+  if(levelEl.value === "beginner") return chooseBeginner();
+  if(levelEl.value === "advanced") return chooseAdvanced();
+  return choosePro();
+}
+
+function chooseBeginner(){
+  const actions = allLegalActions(board, used, currentPiece);
+  const wins = actions.filter(a => a.win);
+  if(wins.length && Math.random() < .7) return wins[Math.floor(Math.random()*wins.length)];
+  return actions[Math.floor(Math.random()*actions.length)];
+}
+
+function chooseAdvanced(){
+  const actions = allLegalActions(board, used, currentPiece);
+  const wins = actions.filter(a => a.win);
+  if(wins.length) return wins[0];
+
+  const safe = actions.filter(a => {
+    const nb = afterPlace(board,a.cell,currentPiece);
+    return a.nextPiece !== null && immediateWinningCells(nb,a.nextPiece,squaresEl.checked).length === 0;
+  });
+
+  const pool = safe.length ? safe : actions;
+  return pool.map(a => ({a, score: heuristicForAction(a)})).sort((x,y) => y.score-x.score)[0].a;
+}
+
+function choosePro(){
+  const actions = allLegalActions(board, used, currentPiece);
+  const wins = actions.filter(a => a.win);
+  if(wins.length) return wins[0];
+
+  let best = null;
+  let bestScore = -Infinity;
+  const depth = board.filter(x => x !== null).length < 6 ? 3 : 5;
+
+  for(const a of actions){
+    const nb = afterPlace(board,a.cell,currentPiece);
+    if(a.nextPiece === null) return a;
+    const nu = used.slice();
+    nu[a.nextPiece] = true;
+
+    let score = evaluateHumanTurn(nb, nu, a.nextPiece, depth);
+    score += heuristicStatic(nb, a.nextPiece) * 0.025;
+
+    if(score > bestScore){
+      bestScore = score;
+      best = a;
+    }
+  }
+  return best || chooseAdvanced();
+}
+
+// Score: positiv = gut für PC, negativ = gut für Mensch.
+function evaluateHumanTurn(b,u,humanPiece,depth){
+  const humanWins = immediateWinningCells(b,humanPiece,squaresEl.checked);
+  if(humanWins.length) return -100000 - humanWins.length;
+
+  if(depth <= 0 || b.every(x => x !== null)) return heuristicStatic(b,humanPiece);
+
+  let worstForPc = Infinity;
+
+  for(let cell=0; cell<16; cell++){
+    if(b[cell] !== null) continue;
+    const hb = afterPlace(b,cell,humanPiece);
+    if(findWin(hb,squaresEl.checked)) return -100000;
+
+    const rem = remainingPieces(u);
+    if(!rem.length) return 0;
+
+    // Mensch wählt danach eine Figur für den PC und will dem PC schaden.
+    let bestForHumanChoice = Infinity;
+    for(const pcPiece of rem){
+      const nu = u.slice();
+      nu[pcPiece] = true;
+      const reply = evaluatePcTurn(hb, nu, pcPiece, depth-1);
+      if(reply < bestForHumanChoice) bestForHumanChoice = reply;
+    }
+
+    if(bestForHumanChoice < worstForPc) worstForPc = bestForHumanChoice;
+    if(worstForPc <= -90000) break;
+  }
+  return worstForPc;
+}
+
+function evaluatePcTurn(b,u,pcPiece,depth){
+  const pcWins = immediateWinningCells(b,pcPiece,squaresEl.checked);
+  if(pcWins.length) return 100000 + pcWins.length;
+
+  if(depth <= 0 || b.every(x => x !== null)) return heuristicStatic(b,pcPiece);
+
+  let bestForPc = -Infinity;
+  const actions = allLegalActions(b,u,pcPiece);
+
+  for(const a of actions){
+    const nb = afterPlace(b,a.cell,pcPiece);
+    if(a.win) return 100000;
+    if(a.nextPiece === null) return 0;
+
+    const nu = u.slice();
+    nu[a.nextPiece] = true;
+    const score = evaluateHumanTurn(nb,nu,a.nextPiece,depth-1);
+    if(score > bestForPc) bestForPc = score;
+  }
+  return bestForPc;
+}
+
+function heuristicForAction(a){
+  if(a.win) return 999999;
+  const nb = afterPlace(board,a.cell,currentPiece);
+  const danger = a.nextPiece === null ? 0 : immediateWinningCells(nb,a.nextPiece,squaresEl.checked).length;
+  return heuristicStatic(nb,a.nextPiece ?? 0) - danger * 2000;
+}
+
+function heuristicStatic(b, givenPiece){
+  let score = 0;
+  for(const g of allGroups(squaresEl.checked)){
+    const ids = g.map(i => b[i]).filter(x => x !== null);
+    const empty = 4 - ids.length;
+    if(ids.length === 0 || empty === 0) continue;
+
+    for(let bit=0; bit<4; bit++){
+      const mask = 1 << bit;
+      const one = ids.every(id => (id & mask) !== 0);
+      const zero = ids.every(id => (id & mask) === 0);
+      if(one || zero){
+        if(empty === 1) score += 120;
+        if(empty === 2) score += 24;
+        if(empty === 3) score += 4;
+      }
+    }
+  }
+
+  if(givenPiece !== null && givenPiece !== undefined){
+    score -= immediateWinningCells(b,givenPiece,squaresEl.checked).length * 500;
+  }
+
+  return score;
+}
+
+newGameBtn.addEventListener("click", init);
+levelEl.addEventListener("change", init);
+squaresEl.addEventListener("change", init);
+init();
+</script>
+</body>
+</html>
